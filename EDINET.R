@@ -78,13 +78,10 @@ item_ID_ck <- setdiff(unique(df_raw$item_ID), unique(df_maekai$item_ID)) # 今�
 
 # 確認結果
 df_ck <- df_raw %>%
-  filter(
-    item %in% item_ck |
-      item_ID %in% item_ID_ck
-  )
+  filter(item %in% item_ck | item_ID %in% item_ID_ck)
 
 # df_ckに値が含まれていた場合（前回との差分がある場合）、マスタ保守の必要があるため処理を中断
-if(!nrow(df_ck) == 0){
+if(nrow(df_ck) > 0){
   stop("df_ckを確認し、マスタを保守してください")
   print(df_ck)
 }
