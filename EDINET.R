@@ -113,8 +113,7 @@ df <- df_raw %>%
   # 純資産マスタを結合
   left_join(capital, by = "item_ID") %>% 
   mutate(item = if_else(item_ID == "CurrentYearInstant_NonConsolidatedMember",
-                        item, item_capital
-                        )) %>% 
+                        item, item_capital)) %>% 
   select(item, currency, firm_ID, value) %>% 
   left_join(firm_list, by = "firm_ID") %>% # 企業マスタの結合
   # 順番並び替えのための準備
