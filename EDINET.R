@@ -5,6 +5,8 @@ library(tidyverse)
 library(readxl)
 library(tictoc)
 library(writexl)
+source("function/get_json.R")  # docID 取得関数
+source("function/get_files.R") # ファイル 取得関数
 
 tic() # 時間計測開始
 
@@ -12,12 +14,16 @@ tic() # 時間計測開始
 time_now <- format(Sys.time(), "%Y%m%d_%H%M%S")
 
 # 設定 ----------------------------------------------------------------------
-df_maekai_file <- "df_raw_20250728_231609.xlsx" # 前回のファイル名
+df_maekai_file <- "df_raw_20250802_232337.xlsx" # 前回のファイル名
 
 master_path <- "master.xlsx"    # マスタファイルのパス 
 df_maekai_path <- "df_maekai/"  # 前回フォルダのパス
 result_path <- "result/"        # 結果フォルダのパス
+data_path <- "data/"             # データフォルダのパス
 
+start_date <- "2025-06-01"      # 集計開始時期
+end_date <- "2025-07-31"        # 集計終了時期
+api_key <- "xxxxxxxxxxx" # APIキー
 
 # マスタ読み込み -----------------------------------------------------------------
 # マスタファイル内の全シート名を取得
@@ -42,15 +48,24 @@ firm_order <- unlist(firm_list$firm_name) # firmの順番を指定
 
 
 # データ読み込み -----------------------------------------------------------------
-# ０）前回ファイルの読み込み
+# 0）前回ファイルの読み込み
 df_maekai <- read_xlsx(str_c(df_maekai_path, df_maekai_file))
+
+# docIDの読み込み
+docID_all <- get_json(start_date, end_date, api_key)
+
+# docID_allのうち、企業マスタに含まれるものを抽出
+docID <- docID_all %>% 
+  filter(edinetCode %in% firm_list$firm_ID)
+
+get_files(docID, data_path, api_key)
 
 # 一時フォルダ作成（自動で削除可能な場所）
 tmp_dir <- tempfile("data_tmp_")
 dir.create(tmp_dir)
 
 # 1) ZIPを一時フォルダに解凍
-zip_files <- list.files("data", pattern = "\\.zip$", full.names = TRUE)
+zip_files <- list.files(str_c(data_path, "/zip"), pattern = "\\.zip$", full.names = TRUE)
 for (zip in zip_files) {
   unzip(zip, exdir = tmp_dir)
 }
@@ -62,9 +77,9 @@ csv_files <- list.files(file.path(tmp_dir, "XBRL_TO_CSV"),
 # 3) ファイル名からfirm_IDとdateを抽出する関数
 extract_info <- function(path) {
   fname <- basename(path)
-  firm_id <- str_extract(fname, "_E\\d{5}(?=-)") %>% str_remove("^_") # firm_IDの抽出
+  firm_ID <- str_extract(fname, "_E\\d{5}(?=-)") %>% str_remove("^_") # firm_IDの抽出
   date <- str_extract(fname, "\\d{4}-\\d{2}-\\d{2}") %>% ymd() # dateの抽出＆日付型に変換
-  list(firm_ID = firm_id, date = date)
+  list(firm_ID = firm_ID, date = date)
 }
 
 # 4) データ読み込み、firm_IDとdate列を追加して結合
@@ -94,7 +109,7 @@ df_raw <- map_dfr(csv_files, function(file) {
 # df_rawを一旦保存（次回の比較のため）
 write_xlsx(df_raw, str_c(df_maekai_path, "df_raw_", time_now, ".xlsx")) 
 
-# 4) 一時フォルダ削除
+# 5) 一時フォルダ削除
 unlink(tmp_dir, recursive = TRUE)
 
 # 前回ファイルと今回ファイルの差分を確認
